@@ -8,7 +8,7 @@ public class RoboTom
 {
     public static RoboTom Instance { get; } = new();
     public static Dictionary<string, string>? Config { get; } = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText("./config.json"));
-    public DiscordSocketClient Client { get; }= new();
+    public DiscordSocketClient Client { get; } = new();
 
     public static Task Main(string[] args) => Instance.MainAsync();
 
@@ -34,7 +34,8 @@ public class RoboTom
 
     private async Task Ready()
     {
-        if (Environment.GetCommandLineArgs()[1] == "init")
+        string[] args = Environment.GetCommandLineArgs();
+        if (args.Length > 1 && args[1] == "init")
         {
             await Commands.InitCommands();
         }
