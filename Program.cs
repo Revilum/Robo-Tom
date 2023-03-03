@@ -16,12 +16,12 @@ public class RoboTom
     {
         Client.Log += Log;
         Client.Ready += Ready;
-        Client.SlashCommandExecuted += Commands.RunCommand;
+        Client.SlashCommandExecuted += Commands.RunCommand.Run;
     }
     
     private async Task MainAsync()
     {
-        await Client.LoginAsync(TokenType.Bot, Config?["token"]);
+        await Client.LoginAsync(TokenType.Bot, Config?["discord-token"]);
         await Client.StartAsync();
         await Task.Delay(-1);
     }
@@ -37,7 +37,7 @@ public class RoboTom
         string[] args = Environment.GetCommandLineArgs();
         if (args.Length > 1 && args[1] == "init")
         {
-            await Commands.InitCommands();
+            await Commands.RunCommand.InitCommands();
         }
     }
 }

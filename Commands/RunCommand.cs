@@ -1,9 +1,9 @@
 using Discord;
 using Discord.WebSocket;
 
-namespace Robo_Tom;
+namespace Robo_Tom.Commands;
 
-public static class Commands
+public static class RunCommand
 {
     public static async Task InitCommands()
     {
@@ -22,13 +22,23 @@ public static class Commands
         await RoboTom.Instance.Client.BulkOverwriteGlobalApplicationCommandsAsync(commands);
     }
     
-    public static Task RunCommand (SocketSlashCommand cmd)
+    public static async Task Run(SocketSlashCommand cmd)
     {
         switch (cmd.CommandName)
         {
             case "play":
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await Play.PlayInGuild(cmd);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex);
+                    }
+                });
                 break;
         }
-        return Task.CompletedTask;
     }
 }
