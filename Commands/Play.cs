@@ -1,102 +1,77 @@
-using System.Diagnostics;
 using Discord;
 using Discord.Audio;
 using Discord.WebSocket;
-using LibVLCSharp.Shared;
 using Robo_Tom.Playable;
-using YoutubeExplode;
+using Robo_Tom.Utils;
 
 namespace Robo_Tom.Commands;
 
 public class Play
 {
-    private static readonly YoutubeClient YtClient = new();
     private static readonly Dictionary<ulong, Play> ActiveGuilds = new();
     
-    private ulong GuildId { get; }
-    private int SinkId { get; }
-    private LibVLC Vlc { get; }
+    private readonly Queue _queue = new();
+    private readonly CancellationTokenSource _cancelToken = new();
+    private readonly DiscordMediaPlayer _player;
 
-    private Play(SocketSlashCommand cmd)
+    private Play(IDiscordInteraction cmd)
     {
-        GuildId = (ulong)cmd.GuildId!;
-        SinkId = CreateSink(GuildId);
-        Vlc = new LibVLC();
+        _player = new DiscordMediaPlayer(cmd.GuildId.ToString()!);
     }
 
     public static async Task PlayInGuild(SocketSlashCommand cmd)
     {
         ulong guildId = (ulong)cmd.GuildId!;
-        if (ActiveGuilds.ContainsKey(guildId))
+        string query = cmd.Data.Options.First().Value.ToString()!;
+        YouTube playable = new(query);
+        if (ActiveGuilds.TryGetValue(guildId, out Play party))
         {
-            await cmd.RespondAsync("Bot is already playing!");
+            party._queue.AddToQueue(playable);
+            await cmd.ModifyOriginalResponseAsync(x => x.Embed = playable.ToEmbed());
         }
         else
         {
+            IVoiceChannel? vc = GetVoiceChannelFromUser(cmd);
+            if (vc == null)
+            {
+                await cmd.ModifyOriginalResponseAsync(x => x.Content = "Please join a voice channel.");
+                return;
+            }
+            
             Play newInstance = new(cmd);
             ActiveGuilds.Add(guildId, newInstance);
-            await newInstance.PlayStream(cmd, new YouTube());
+            await cmd.ModifyOriginalResponseAsync(x => x.Embed = playable.ToEmbed());
+            await newInstance.PlayStream(vc, playable);
         }
         
     }
     
-    private async Task PlayStream(SocketSlashCommand cmd, IPlayable toPlay)
+    private async Task PlayStream(IVoiceChannel vc, Playable.Playable toPlay)
     {
-        IVoiceChannel vc = (IVoiceChannel)RoboTom.Instance.Client.GetChannel(437588500263600140);
+        _queue.AddToQueue(toPlay);
+        
         IAudioClient audioClient = await vc.ConnectAsync();
         
-        using Process rawProcess = CreateStream(GuildId.ToString())!;
-        Media media = new(Vlc, new StreamMediaInput(await toPlay.GetStream(cmd.Data.Options.First().Value.ToString()!)));
-        MediaPlayer player = new(media);
-        player.SetOutputDevice(GuildId.ToString());
-
-        await using Stream output = rawProcess.StandardOutput.BaseStream;
+        
         await using AudioOutStream discord = audioClient.CreatePCMStream(AudioApplication.Music);
         try
         {
-            player.Play();
-            await output.CopyToAsync(discord);
-
+            foreach (Playable.Playable playable in _queue)
+            {
+                _player.PlayStream(await playable.GetStream());
+                await _player.AudioOutputStream.CopyToAsync(discord, _cancelToken.Token);
+            }
         }
         finally
         {
             await discord.FlushAsync();
-            DeleteSink(SinkId);
             await vc.DisconnectAsync();
         }
     }
 
-    private static Process? CreateStream(string sink)
+    private static IVoiceChannel? GetVoiceChannelFromUser(IDiscordInteraction cmd)
     {
-        return Process.Start(new ProcessStartInfo
-        {
-            FileName = "parec",
-            Arguments = $"-d {sink}.monitor --format=s16le --rate=48000 --channels=2",
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-        });
-    }
-
-    private static int CreateSink(ulong guildId)
-    {
-        Process process = Process.Start(new ProcessStartInfo
-        {
-            FileName = "pactl",
-            Arguments = $"load-module module-null-sink sink_name={guildId}",
-            UseShellExecute = false,
-            RedirectStandardOutput = true
-        })!;
-        using StreamReader reader = new(process.StandardOutput.BaseStream);
-        return int.Parse(reader.ReadToEnd());
-    }
-
-    private static void DeleteSink(int id)
-    {
-        Process.Start(new ProcessStartInfo
-        {
-            FileName = "pactl",
-            Arguments = $"unload-module {id}",
-            UseShellExecute = false
-        });
+        return RoboTom.Instance.Client.GetGuild((ulong)cmd.GuildId!).VoiceChannels.FirstOrDefault(voiceChannel =>
+            voiceChannel.ConnectedUsers.Any(voiceUser => voiceUser.Id == cmd.User.Id));
     }
 }

@@ -4,15 +4,28 @@ using YoutubeExplode.Videos.Streams;
 
 namespace Robo_Tom.Playable;
 
-public class YouTube : IPlayable
+public class YouTube : Playable
 {
     private static readonly YoutubeClient YoutubeClient = new();
-    public async Task<Stream> GetStream(string input)
+    private readonly VideoSearchResult _video;
+
+    public YouTube(string query)
     {
-        IAsyncEnumerable<VideoSearchResult> videos =
-            YoutubeClient.Search.GetVideosAsync(input);
-        string video = (await videos.FirstAsync()).Url;
-        StreamManifest manifest = await YoutubeClient.Videos.Streams.GetManifestAsync(video);
+        _video = YoutubeClient.Search.GetVideosAsync(query).FirstAsync().GetAwaiter().GetResult();
+    }
+    public override string GetTitle()
+    {
+        return _video.Title;
+    }
+
+    public override TimeSpan? GetDuration()
+    {
+        return _video.Duration;
+    }
+
+    public override async Task<Stream> GetStream()
+    {
+        StreamManifest manifest = await YoutubeClient.Videos.Streams.GetManifestAsync(_video.Url);
         IStreamInfo streamInfo = manifest.GetAudioOnlyStreams().GetWithHighestBitrate();
         return await YoutubeClient.Videos.Streams.GetAsync(streamInfo);
     }

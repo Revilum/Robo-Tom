@@ -1,2 +1,2 @@
 # Robo-Tom
-A person music discord bot 
+A personal music discord bot 

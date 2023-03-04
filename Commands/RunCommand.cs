@@ -24,6 +24,7 @@ public static class RunCommand
     
     public static async Task Run(SocketSlashCommand cmd)
     {
+        await cmd.DeferAsync();
         switch (cmd.CommandName)
         {
             case "play":

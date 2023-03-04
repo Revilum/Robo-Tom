@@ -21,7 +21,7 @@ public class RoboTom
     
     private async Task MainAsync()
     {
-        await Client.LoginAsync(TokenType.Bot, Config?["discord-token"]);
+        await Client.LoginAsync(TokenType.Bot, Config?["token"]);
         await Client.StartAsync();
         await Task.Delay(-1);
     }
