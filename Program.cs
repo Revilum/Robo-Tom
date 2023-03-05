@@ -1,38 +1,26 @@
 ﻿using System.Text.Json;
 using Discord;
 using Discord.WebSocket;
+using Robo_Tom.Utils;
 
 namespace Robo_Tom;
 
-public class RoboTom
+public static class RoboTom
 {
-    public static RoboTom Instance { get; } = new();
-    public static Dictionary<string, string>? Config { get; } = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText("./config.json"));
-    public DiscordSocketClient Client { get; } = new();
+    private static Dictionary<string, string>? Config { get; } = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText("./config.json"));
+    public static DiscordSocketClient Client { get; } = new();
 
-    public static Task Main(string[] args) => Instance.MainAsync();
-
-    private RoboTom()
+    public static async Task Main()
     {
-        Client.Log += Log;
+        Client.Log += LogAsync;
         Client.Ready += Ready;
         Client.SlashCommandExecuted += Commands.RunCommand.Run;
-    }
-    
-    private async Task MainAsync()
-    {
         await Client.LoginAsync(TokenType.Bot, Config?["token"]);
         await Client.StartAsync();
         await Task.Delay(-1);
     }
 
-    private Task Log(LogMessage log)
-    {
-        Console.WriteLine(log.Message + log.Exception);
-        return Task.CompletedTask;
-    }
-
-    private async Task Ready()
+    private static async Task Ready()
     {
         string[] args = Environment.GetCommandLineArgs();
         if (args.Length > 1 && args[1] == "init")
@@ -40,4 +28,19 @@ public class RoboTom
             await Commands.RunCommand.InitCommands();
         }
     }
+
+    public static Task LogAsync(LogMessage message)
+    {
+        if (message.Exception is InteractionException cmdException && cmdException.Interaction.GetType() == typeof(SocketSlashCommand))
+        {
+            Console.WriteLine($"[Command/{message.Severity}] {((SocketSlashCommand)cmdException.Interaction).CommandName}"
+                              + $" failed to execute in {Client.GetChannel((ulong)cmdException.Interaction.ChannelId!)}.");
+            Console.WriteLine(cmdException.Exception);
+        }
+        else 
+            Console.WriteLine($"[General/{message.Severity}] {message}");
+
+        return Task.CompletedTask;
+    }
+
 }

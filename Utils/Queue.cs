@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-
 namespace Robo_Tom.Utils;
 
 public class Queue

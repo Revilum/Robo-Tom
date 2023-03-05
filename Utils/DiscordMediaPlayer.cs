@@ -8,14 +8,17 @@ public class DiscordMediaPlayer : IDisposable
     private readonly LibVLC _vlc = new();
     private readonly MediaPlayer _player;
     private readonly int _sinkId;
+    private readonly ulong _guildId;
     private readonly Process _outputProcess;
     private readonly CancellationTokenSource _cancelToken;
     public readonly Stream AudioOutputStream;
     public readonly Queue Queue = new();
 
-    public DiscordMediaPlayer(string sinkName, CancellationTokenSource token)
+    public DiscordMediaPlayer(ulong guildId, CancellationTokenSource token)
     {
+        string sinkName = guildId.ToString();
         _cancelToken = token;
+        _guildId = guildId;
         _sinkId = CreateSink(sinkName);
         _outputProcess = CreateStream(sinkName);
         AudioOutputStream = _outputProcess.StandardOutput.BaseStream;
@@ -66,6 +69,11 @@ public class DiscordMediaPlayer : IDisposable
     {
         _player.Volume = volume;
     }
+
+    public void SkipTo(TimeSpan timeSpan)
+    {
+        _player.SeekTo(timeSpan);
+    }
     
     private static Process CreateStream(string sink)
     {
@@ -104,6 +112,7 @@ public class DiscordMediaPlayer : IDisposable
     public void Dispose()
     {
         GC.SuppressFinalize(this);
+        Commands.Play.RemoveInstance(_guildId);
         _outputProcess.Close();
         _vlc.Dispose();
         DeleteSink(_sinkId);
