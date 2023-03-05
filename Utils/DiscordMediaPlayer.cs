@@ -9,21 +9,42 @@ public class DiscordMediaPlayer : IDisposable
     private readonly MediaPlayer _player;
     private readonly int _sinkId;
     private readonly Process _outputProcess;
+    private readonly CancellationTokenSource _cancelToken;
     public readonly Stream AudioOutputStream;
+    public readonly Queue Queue = new();
 
-    public DiscordMediaPlayer(string sinkName)
+    public DiscordMediaPlayer(string sinkName, CancellationTokenSource token)
     {
+        _cancelToken = token;
         _sinkId = CreateSink(sinkName);
         _outputProcess = CreateStream(sinkName);
         AudioOutputStream = _outputProcess.StandardOutput.BaseStream;
         
         _player = new MediaPlayer(_vlc);
         _player.SetAudioOutput(sinkName);
+        _player.EndReached += async (x, y) => await PlayNext();
+    }
+
+    public async Task PlayNext()
+    {
+        Playable.Playable? nextItem = Queue.GetNextItem();
+        if (nextItem == null)
+        {
+            Stop();
+            return;
+        }
+        PlayStream(await nextItem.GetStream());
     }
 
     public void PlayStream(Stream stream)
     {
         _player.Play(new Media(_vlc, new StreamMediaInput(stream)));
+    }
+
+    public void Stop()
+    {
+        _cancelToken.Cancel();
+        Dispose();
     }
 
     public void Play()

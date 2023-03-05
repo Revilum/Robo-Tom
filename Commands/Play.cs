@@ -9,14 +9,12 @@ namespace Robo_Tom.Commands;
 public class Play
 {
     private static readonly Dictionary<ulong, Play> ActiveGuilds = new();
-    
-    private readonly Queue _queue = new();
     private readonly CancellationTokenSource _cancelToken = new();
     private readonly DiscordMediaPlayer _player;
 
     private Play(IDiscordInteraction cmd)
     {
-        _player = new DiscordMediaPlayer(cmd.GuildId.ToString()!);
+        _player = new DiscordMediaPlayer(cmd.GuildId.ToString()!, _cancelToken);
     }
 
     public static async Task PlayInGuild(SocketSlashCommand cmd)
@@ -26,7 +24,7 @@ public class Play
         YouTube playable = new(query);
         if (ActiveGuilds.TryGetValue(guildId, out Play party))
         {
-            party._queue.AddToQueue(playable);
+            party._player.Queue.AddToQueue(playable);
             await cmd.ModifyOriginalResponseAsync(x => x.Embed = playable.ToEmbed());
         }
         else
@@ -46,21 +44,20 @@ public class Play
         
     }
     
-    private async Task PlayStream(IVoiceChannel vc, Playable.Playable toPlay)
+    private async Task PlayStream(IAudioChannel vc, Playable.Playable toPlay)
     {
-        _queue.AddToQueue(toPlay);
-        
+        _player.Queue.AddToQueue(toPlay);
         IAudioClient audioClient = await vc.ConnectAsync();
-        
         
         await using AudioOutStream discord = audioClient.CreatePCMStream(AudioApplication.Music);
         try
         {
-            foreach (Playable.Playable playable in _queue)
-            {
-                _player.PlayStream(await playable.GetStream());
-                await _player.AudioOutputStream.CopyToAsync(discord, _cancelToken.Token);
-            }
+            await _player.PlayNext();
+            await _player.AudioOutputStream.CopyToAsync(discord, _cancelToken.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            Console.WriteLine("Playback was canceled");
         }
         finally
         {
