@@ -15,6 +15,7 @@ public static class RoboTom
         Client.Log += LogAsync;
         Client.Ready += Ready;
         Client.SlashCommandExecuted += Commands.RunCommand.Run;
+        
         await Client.LoginAsync(TokenType.Bot, Config?["token"]);
         await Client.StartAsync();
         await Task.Delay(-1);

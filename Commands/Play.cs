@@ -10,25 +10,33 @@ public class Play
 {
     private static readonly Dictionary<ulong, Play> ActiveGuilds = new();
     private readonly CancellationTokenSource _cancelToken = new();
-    private readonly DiscordMediaPlayer _player;
+    public readonly DiscordMediaPlayer Player;
+    public readonly IVoiceChannel Vc;
 
-    private Play(ulong guildId)
+    private Play(ulong guildId, IVoiceChannel vc)
     {
-        _player = new DiscordMediaPlayer(guildId, _cancelToken);
+        Vc = vc;
+        Player = new DiscordMediaPlayer(guildId, _cancelToken);
     }
 
-    public static async Task<Play?> GetInstance(SocketSlashCommand cmd)
+    public static Play? GetInstance(ulong guildId)
+    {
+        ActiveGuilds.TryGetValue(guildId, out Play? value);
+        return value;
+    }
+
+    public static async Task<Play?> CreateInstance(SocketSlashCommand cmd)
     {
         ulong guildId = (ulong)cmd.GuildId!;
-        if (ActiveGuilds.TryGetValue(guildId, out Play instance))
+        if (ActiveGuilds.TryGetValue(guildId, out Play? instance))
         {
             return instance;
         }
-        IVoiceChannel? vc = GetVoiceChannelFromUser(cmd);
+        IVoiceChannel? vc = Tools.GetVoiceChannelFromUser(cmd);
         if (vc == null)
             return null;
         
-        Play newInstance = new(guildId);
+        Play newInstance = new(guildId, vc);
         ActiveGuilds.Add(guildId, newInstance);
         await newInstance.JoinVoiceChannel(vc);
         return newInstance;
@@ -44,16 +52,15 @@ public class Play
         string query = cmd.Data.Options.First().Value.ToString()!;
         playable ??= new YouTube(query);
         
-        Play? instance = await GetInstance(cmd);
+        Play? instance = await CreateInstance(cmd);
         if (instance == null)
         {
             await cmd.ModifyOriginalResponseAsync(x => x.Content = "Please join a voice channel.");
             return;
         }
-        instance._player.Queue.AddToQueue(playable);
+        instance.Player.Queue.AddToQueue(playable);
         await cmd.ModifyOriginalResponseAsync(x => x.Embed = playable.ToEmbed());
-        await instance._player.PlayNext();
-
+        await instance.Player.Start();
     }
     
     private async Task JoinVoiceChannel(IAudioChannel vc)
@@ -65,8 +72,8 @@ public class Play
             await using AudioOutStream discord = audioClient.CreatePCMStream(AudioApplication.Music);
             try
             {
-                _player.Play();
-                await _player.AudioOutputStream.CopyToAsync(discord, _cancelToken.Token);
+                Player.Play();
+                await Player.AudioOutputStream.CopyToAsync(discord, _cancelToken.Token);
             }
             catch (OperationCanceledException) {}
             finally
@@ -75,11 +82,5 @@ public class Play
                 await vc.DisconnectAsync();
             }
         });
-    }
-
-    private static IVoiceChannel? GetVoiceChannelFromUser(IDiscordInteraction cmd)
-    {
-        return RoboTom.Client.GetGuild((ulong)cmd.GuildId!).VoiceChannels.FirstOrDefault(voiceChannel =>
-            voiceChannel.ConnectedUsers.Any(voiceUser => voiceUser.Id == cmd.User.Id));
     }
 }

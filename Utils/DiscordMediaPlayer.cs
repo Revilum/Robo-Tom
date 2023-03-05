@@ -10,6 +10,7 @@ public class DiscordMediaPlayer : IDisposable
     private readonly int _sinkId;
     private readonly ulong _guildId;
     private readonly Process _outputProcess;
+    private bool _justCreated;
     private readonly CancellationTokenSource _cancelToken;
     public readonly Stream AudioOutputStream;
     public readonly Queue Queue = new();
@@ -21,6 +22,7 @@ public class DiscordMediaPlayer : IDisposable
         _guildId = guildId;
         _sinkId = CreateSink(sinkName);
         _outputProcess = CreateStream(sinkName);
+        _justCreated = true;
         AudioOutputStream = _outputProcess.StandardOutput.BaseStream;
         
         _player = new MediaPlayer(_vlc);
@@ -48,6 +50,15 @@ public class DiscordMediaPlayer : IDisposable
     {
         _cancelToken.Cancel();
         Dispose();
+    }
+
+    public async Task Start()
+    {
+        if (_justCreated)
+        {
+            _justCreated = false;
+            await PlayNext();
+        }
     }
 
     public void Play()
@@ -106,14 +117,15 @@ public class DiscordMediaPlayer : IDisposable
             FileName = "pactl",
             Arguments = $"unload-module {id}",
             UseShellExecute = false
-        });
+        })!.WaitForExit();
     }
 
     public void Dispose()
     {
         GC.SuppressFinalize(this);
         Commands.Play.RemoveInstance(_guildId);
-        _outputProcess.Close();
+        _outputProcess.Kill();
+        _player.Dispose();
         _vlc.Dispose();
         DeleteSink(_sinkId);
     }
