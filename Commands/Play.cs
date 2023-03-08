@@ -8,7 +8,7 @@ namespace Robo_Tom.Commands;
 
 public class Play
 {
-    private static readonly Dictionary<ulong, Play> ActiveGuilds = new();
+    public static readonly Dictionary<ulong, Play> ActiveGuilds = new();
     private readonly CancellationTokenSource _cancelToken = new();
     public readonly DiscordMediaPlayer Player;
     public readonly IVoiceChannel Vc;
@@ -25,7 +25,7 @@ public class Play
         return value;
     }
 
-    public static async Task<Play?> CreateInstance(SocketSlashCommand cmd)
+    private static async Task<Play?> CreateInstance(IDiscordInteraction cmd)
     {
         ulong guildId = (ulong)cmd.GuildId!;
         if (ActiveGuilds.TryGetValue(guildId, out Play? instance))
@@ -40,11 +40,6 @@ public class Play
         ActiveGuilds.Add(guildId, newInstance);
         await newInstance.JoinVoiceChannel(vc);
         return newInstance;
-    }
-
-    public static void RemoveInstance(ulong guildId)
-    {
-        ActiveGuilds.Remove(guildId);
     }
 
     public static async Task AddSongToQueue(SocketSlashCommand cmd, Playable.Playable? playable = null)
@@ -72,6 +67,12 @@ public class Play
             await using AudioOutStream discord = audioClient.CreatePCMStream(AudioApplication.Music);
             try
             {
+                audioClient.ClientDisconnected += async _ =>
+                {
+                    if (await Vc.GetUsersAsync().CountAsync() == 0)
+                        Player.Stop();
+                };
+                
                 Player.Play();
                 await Player.AudioOutputStream.CopyToAsync(discord, _cancelToken.Token);
             }

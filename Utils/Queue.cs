@@ -1,11 +1,14 @@
+using Discord;
+
 namespace Robo_Tom.Utils;
 
 public class Queue
 {
     private readonly List<Playable.Playable> _list = new();
     public QueueTypes Type { get; set; } = QueueTypes.Queue;
-    public bool Loop { get; set; } = false;
+    public bool Loop { get; set; }
     private int _nextSong;
+    private Playable.Playable _current = null!;
 
     public void AddToQueue(Playable.Playable playable)
     {
@@ -22,6 +25,7 @@ public class Queue
         {
             case QueueTypes.Queue:
                 item = _list[_nextSong];
+                _current = item;
                 if (Loop)
                     _nextSong = Tools.Mod(_nextSong + 1, _list.Count);
                 else
@@ -44,7 +48,24 @@ public class Queue
             default:
                 throw new ArgumentOutOfRangeException();
         }
-        
         return item;
+    }
+    
+    public Embed ToEmbed()
+    {
+        string[] indices = new[]{"**current**"}.Concat(_list.Select(song => $"**{_list.IndexOf(song) + 1}**")).ToArray();
+        string[] titles = new[]{_current.GetTitle()}.Concat(_list.Select(song => song.GetTitle())).ToArray();
+        string[] duration = new[]{$"`{Tools.TimeSpanToString(_current.GetDuration())}`"}
+            .Concat(_list.Select(song => $"`{Tools.TimeSpanToString(song.GetDuration())}`")).ToArray();
+        
+        EmbedBuilder builder = new EmbedBuilder()
+            .WithTitle("Playlist")
+            .WithColor(Color.Blue)
+            .WithCurrentTimestamp()
+            .AddField("Position", string.Join("\n", indices), true)
+            .AddField("Title", string.Join("\n", titles), true)
+            .AddField("Duration", string.Join($"\n", duration), true);
+        
+        return builder.Build();
     }
 }

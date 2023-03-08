@@ -1,11 +1,17 @@
 using Discord;
-using Discord.WebSocket;
 using Robo_Tom.Commands;
 
 namespace Robo_Tom.Utils;
 
 public static class Tools
 {
+    public static readonly Embed CommandFailedEmbed = new EmbedBuilder()
+        .WithTitle("Error")
+        .WithDescription("You or the bot must be in a voice channel in order to use the command.")
+        .WithColor(Color.Red)
+        .WithCurrentTimestamp()
+        .Build();
+    
     public static Task RunInBackGround(Func<Task> task)
     {
         Task.Run(task).ContinueWith(t =>
@@ -22,7 +28,7 @@ public static class Tools
             voiceChannel.ConnectedUsers.Any(voiceUser => voiceUser.Id == cmd.User.Id));
     }
 
-    public static bool IsInVoice(IDiscordInteraction cmd)
+    private static bool IsInVoice(IDiscordInteraction cmd)
     {
         Play? instance = Play.GetInstance((ulong)cmd.GuildId!);
         if (instance == null)
@@ -40,20 +46,13 @@ public static class Tools
 
     public static async Task ChangePlayer(IDiscordInteraction cmd, Action<DiscordMediaPlayer> func, Embed success)
     {
-        Embed notInVcEmbed = new EmbedBuilder()
-            .WithTitle("Error")
-            .WithDescription("You must be in a voice channel in order to use the command.")
-            .WithColor(Color.Red)
-            .WithCurrentTimestamp()
-            .Build();
-        
         if (IsInVoice(cmd))
         {
             func(Play.GetInstance((ulong)cmd.GuildId!)!.Player);
             await cmd.ModifyOriginalResponseAsync(x => x.Embed = success);
             return;
         }
-        await cmd.ModifyOriginalResponseAsync(x => x.Embed = notInVcEmbed);
+        await cmd.ModifyOriginalResponseAsync(x => x.Embed = CommandFailedEmbed);
     }
 
     public static Embed GetSuccessEmbed(string title, string description)
@@ -64,5 +63,30 @@ public static class Tools
             .WithColor(Color.Green)
             .WithCurrentTimestamp()
             .Build();
+    }
+
+    public static QueueTypes ConvertToQueueType(string name)
+    {
+        QueueTypes type = name switch
+        {
+            "queue" => QueueTypes.Queue,
+            "stack" => QueueTypes.Stack,
+            "shuffle" => QueueTypes.Random,
+            _ => throw new IndexOutOfRangeException()
+        };
+        return type;
+    }
+
+    public static void StopAllPlayback()
+    {
+        foreach ((_, Play play) in Play.ActiveGuilds)
+        {
+            play.Player.Stop();
+        }
+    }
+
+    public static string TimeSpanToString(TimeSpan? span)
+    {
+        return span == null ? "--:--" : ((TimeSpan)span).ToString( @"mm\:ss");
     }
 }

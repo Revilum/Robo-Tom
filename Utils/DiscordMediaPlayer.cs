@@ -5,13 +5,14 @@ namespace Robo_Tom.Utils;
 
 public class DiscordMediaPlayer : IDisposable
 {
-    private readonly LibVLC _vlc = new();
+    private static readonly LibVLC Vlc = new();
     private readonly MediaPlayer _player;
     private readonly int _sinkId;
     private readonly ulong _guildId;
     private readonly Process _outputProcess;
     private bool _justCreated;
     private readonly CancellationTokenSource _cancelToken;
+    
     public readonly Stream AudioOutputStream;
     public readonly Queue Queue = new();
 
@@ -25,9 +26,9 @@ public class DiscordMediaPlayer : IDisposable
         _justCreated = true;
         AudioOutputStream = _outputProcess.StandardOutput.BaseStream;
         
-        _player = new MediaPlayer(_vlc);
-        _player.SetAudioOutput(sinkName);
-        _player.EndReached += async (x, y) => await PlayNext();
+        _player = new MediaPlayer(Vlc);
+        _player.SetOutputDevice(sinkName);
+        _player.EndReached += async (_, _) => await PlayNext();
     }
 
     public async Task PlayNext()
@@ -43,7 +44,7 @@ public class DiscordMediaPlayer : IDisposable
 
     public void PlayStream(Stream stream)
     {
-        _player.Play(new Media(_vlc, new StreamMediaInput(stream)));
+        _player.Play(new Media(Vlc, new StreamMediaInput(stream)));
     }
 
     public void Stop()
@@ -71,9 +72,10 @@ public class DiscordMediaPlayer : IDisposable
         _player.Pause();
     }
 
-    public void ChangeSpeed(float speed)
+    public void ChangeSpeed(ulong speed)
     {
-        _player.SetRate(speed);
+        double newSpeed = speed / 100.0;
+        _player.SetRate((float)newSpeed);
     }
 
     public void SetVolume(int volume)
@@ -123,10 +125,9 @@ public class DiscordMediaPlayer : IDisposable
     public void Dispose()
     {
         GC.SuppressFinalize(this);
-        Commands.Play.RemoveInstance(_guildId);
-        _outputProcess.Kill();
+        Commands.Play.ActiveGuilds.Remove(_guildId);
         _player.Dispose();
-        _vlc.Dispose();
+        _outputProcess.Kill();
         DeleteSink(_sinkId);
     }
 }

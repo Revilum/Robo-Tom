@@ -7,11 +7,12 @@ namespace Robo_Tom;
 
 public static class RoboTom
 {
-    private static Dictionary<string, string>? Config { get; } = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText("./config.json"));
+    private static readonly Dictionary<string, string>? Config = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText("./config.json"));
     public static DiscordSocketClient Client { get; } = new();
 
     public static async Task Main()
     {
+        Console.CancelKeyPress += (_, _) => Tools.StopAllPlayback();
         Client.Log += LogAsync;
         Client.Ready += Ready;
         Client.SlashCommandExecuted += Commands.RunCommand.Run;
