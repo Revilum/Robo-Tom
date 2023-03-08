@@ -53,18 +53,35 @@ public class Queue
     
     public Embed ToEmbed()
     {
-        string[] indices = new[]{"**current**"}.Concat(_list.Select(song => $"**{_list.IndexOf(song) + 1}**")).ToArray();
+        List<Playable.Playable> copy = _list.ToArray().ToList();
+        copy.Insert(0, _current);
+        
+        List<string> indices = new();
         string[] titles = new[]{_current.GetTitle()}.Concat(_list.Select(song => song.GetTitle())).ToArray();
-        string[] duration = new[]{$"`{Tools.TimeSpanToString(_current.GetDuration())}`"}
-            .Concat(_list.Select(song => $"`{Tools.TimeSpanToString(song.GetDuration())}`")).ToArray();
+        List<string> durations = new();
+        
+        foreach (Playable.Playable song in copy)
+        {
+            string index = $"**{copy.IndexOf(song)}**";
+            string duration = $"`{Tools.TimeSpanToString(song.GetDuration())}`";
+            for (int i = 0; i < Tools.GetLineBreaks(titles[_list.IndexOf(song)-1]); i++)
+            {
+                index += "\n";
+                duration += "\n";
+            }
+            indices.Add(index);
+            durations.Add(duration);
+        }
+
+        indices[0] = "**current**";
         
         EmbedBuilder builder = new EmbedBuilder()
             .WithTitle("Playlist")
             .WithColor(Color.Blue)
             .WithCurrentTimestamp()
-            .AddField("Position", string.Join("\n", indices), true)
-            .AddField("Title", string.Join("\n", titles), true)
-            .AddField("Duration", string.Join($"\n", duration), true);
+            .AddField("Position", string.Join("\n\n", indices), true)
+            .AddField("Title", string.Join("\n\n", titles), true)
+            .AddField("Duration", string.Join($"\n\n", durations), true);
         
         return builder.Build();
     }

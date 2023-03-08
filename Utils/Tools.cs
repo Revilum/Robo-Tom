@@ -89,4 +89,22 @@ public static class Tools
     {
         return span == null ? "--:--" : ((TimeSpan)span).ToString( @"mm\:ss");
     }
+
+    public static int GetLineBreaks(string title)
+    {
+        string[] split = title.Split(" ");
+        int sum = 0;
+        int final = 0;
+        foreach (string s in split)
+        {
+            sum += s.Length;
+            if (sum > 51)
+            { 
+                sum = s.Length;
+                final += 1;
+            }
+        }
+
+        return final;
+    }
 }
