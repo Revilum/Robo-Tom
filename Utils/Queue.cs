@@ -54,7 +54,15 @@ public class Queue
     public Embed ToEmbed()
     {
         string[] indices = new[]{"**current**"}.Concat(_list.Select(song => $"**{_list.IndexOf(song) + 1}**")).ToArray();
-        string[] titles = new[]{_current.GetTitle()}.Concat(_list.Select(song => song.GetTitle())).ToArray();
+        List<string> titles = new() { _current.GetTitle() };
+        foreach (Playable.Playable song in _list)
+        {
+            if (song.GetTitle().Length > 50)
+                titles.Add(new string(song.GetTitle())+ "...");
+            else
+                titles.Add(song.GetTitle());
+        }
+        
         string[] duration = new[]{$"`{Tools.TimeSpanToString(_current.GetDuration())}`"}
             .Concat(_list.Select(song => $"`{Tools.TimeSpanToString(song.GetDuration())}`")).ToArray();
         
